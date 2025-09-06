@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Donation Receipt Generator</title>
+  <style>
+    :root{--accent:#6b5b53;--muted:#e9e6e5;--paper:#fff;--border:#c9c5c2}
+    body{font-family:Arial, Helvetica, sans-serif;background:#f6f4f3;margin:0;padding:24px}
+    .app{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:380px 1fr;gap:24px}
+    .panel{background:#fff;padding:18px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06)}
+    h2{margin:6px 0 12px;color:var(--accent)}
+    label{display:block;font-size:13px;color:#444;margin-top:10px}
+    input{width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;margin-top:6px}
+    button{padding:10px 12px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer;margin-right:8px}
+    button.secondary{background:#888}
+    .small{font-size:12px;color:#666}
+    .receipt{background:linear-gradient(#f3f1f0,#faf8f7);padding:28px;border-radius:6px;border:1px solid var(--border)}
+    .receipt .top{display:flex;justify-content:space-between;align-items:center}
+    .receipt h1{font-weight:400;margin:0;color:var(--accent);letter-spacing:2px}
+    .table{margin-top:20px;border-top:2px solid var(--border);padding-top:18px}
+    .table .line{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px dashed rgba(0,0,0,0.06)}
+    .total{display:flex;justify-content:flex-end;align-items:center;margin-top:20px}
+    .total .box{border:2px dashed #333;padding:10px 16px;font-weight:700;margin-left:12px}
+    .controls{margin-top:16px}
+    .log{margin-top:12px;max-height:220px;overflow:auto;border:1px solid #eee;padding:8px;border-radius:6px;background:#fff}
+    .log .item{padding:8px;border-bottom:1px solid #f0f0f0;font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="panel">
+      <h2>Receipt controls</h2>
+      <label>Name</label>
+      <input id="name" value="Sis Jessy & Family Thane">
+      <label>Payment via</label>
+      <input id="payment" value="UPI">
+      <label>Amount</label>
+      <input id="amount" value="10000">
+      <label>Description</label>
+      <input id="description" value="National Youth Conference 2024 @ Delhi">
+
+      <div class="controls">
+        <button id="previewBtn">Generate Preview</button>
+        <button id="printBtn" class="secondary">Print / Save PDF</button>
+      </div>
+
+      <h3 style="margin-top:14px">Issued receipts log</h3>
+      <div class="log" id="log"></div>
+    </div>
+
+    <div class="panel">
+      <div class="receipt" id="receiptPreview">
+        <div class="top">
+          <div>
+            <div class="small">Invoice Number: <span id="inv">INV 029</span></div>
+            <div class="small">Payment via: <span id="payPreview">UPI</span></div>
+          </div>
+          <div>
+            <h1>DONATION</h1>
+            <div class="small">Date: <span id="date"></span></div>
+          </div>
+        </div>
+
+        <div class="table">
+          <div class="line">
+            <div id="namePreview">Sis Jessy & Family Thane</div>
+            <div id="descPreview">National Youth Conference 2024 @ Delhi</div>
+            <div id="amountPreview">10000₹</div>
+          </div>
+        </div>
+
+        <div class="total">
+          <div style="flex:1;text-align:center;" class="small">Total in words: <strong id="words">Ten Thousand only.</strong></div>
+          <div class="box" id="totalBox">10000₹</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const el = id => document.getElementById(id);
+
+    function numberToWords(num){
+      num = parseInt(num,10);
+      if(!num) return 'Zero only.';
+      const a=["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
+      const b=["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+      function inHundreds(n){
+        let str='';
+        if(n>=100){str += a[Math.floor(n/100)]+' Hundred '; n%=100}
+        if(n>=20){str += b[Math.floor(n/10)]+' '; if(n%10) str+=a[n%10]+' '} else if(n>0){str += a[n]+' '}
+        return str.trim();
+      }
+      let out='';
+      const thousand = Math.floor(num/1000); if(thousand){out+= inHundreds(thousand)+' Thousand '; num%=1000}
+      if(num>0) out+= inHundreds(num);
+      return out.trim() + ' only.';
+    }
+
+    function updatePreview(){
+      const name = el('name').value;
+      const payment = el('payment').value;
+      const amount = el('amount').value;
+      const desc = el('description').value;
+      el('namePreview').textContent = name;
+      el('payPreview').textContent = payment;
+      el('amountPreview').textContent = amount + '₹';
+      el('totalBox').textContent = amount + '₹';
+      el('descPreview').textContent = desc;
+      el('words').textContent = numberToWords(amount);
+      el('date').textContent = new Date().toLocaleDateString();
+    }
+
+    el('previewBtn').addEventListener('click', updatePreview);
+
+    el('printBtn').addEventListener('click', ()=>{
+      updatePreview();
+      const node = el('receiptPreview').outerHTML;
+      const w = window.open('', '_blank');
+      w.document.write('<html><head><title>Receipt</title></head><body>'+node+'</body></html>');
+      w.document.close();
+      setTimeout(()=>{ w.print(); }, 500);
+    });
+
+    updatePreview();
+  </script>
+</body>
+</html>
