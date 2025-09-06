@@ -1,141 +1,213 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Donation Receipt Generator</title>
+  <meta charset="UTF-8">
+  <title>Receipt Generator</title>
+
+  <!-- ✅ Firebase + html2pdf -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
+
+    // 🔑 INSERT YOUR FIREBASE CONFIG HERE
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    // ✅ Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    // make available globally
+    window.db = db;
+    window.storage = storage;
+    window.doc = doc;
+    window.getDoc = getDoc;
+    window.setDoc = setDoc;
+    window.updateDoc = updateDoc;
+    window.ref = ref;
+    window.uploadBytes = uploadBytes;
+  </script>
+
   <style>
-    :root{--accent:#6b5b53;--muted:#e9e6e5;--paper:#fff;--border:#c9c5c2}
-    body{font-family:Arial, Helvetica, sans-serif;background:#f6f4f3;margin:0;padding:24px}
-    .app{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:380px 1fr;gap:24px}
-    .panel{background:#fff;padding:18px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06)}
-    h2{margin:6px 0 12px;color:var(--accent)}
-    label{display:block;font-size:13px;color:#444;margin-top:10px}
-    input{width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;margin-top:6px}
-    button{padding:10px 12px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer;margin-right:8px}
-    button.secondary{background:#888}
-    .small{font-size:12px;color:#666}
-    .receipt{background:linear-gradient(#f3f1f0,#faf8f7);padding:28px;border-radius:6px;border:1px solid var(--border)}
-    .receipt .top{display:flex;justify-content:space-between;align-items:center}
-    .receipt h1{font-weight:400;margin:0;color:var(--accent);letter-spacing:2px}
-    .table{margin-top:20px;border-top:2px solid var(--border);padding-top:18px}
-    .table .line{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px dashed rgba(0,0,0,0.06)}
-    .total{display:flex;justify-content:flex-end;align-items:center;margin-top:20px}
-    .total .box{border:2px dashed #333;padding:10px 16px;font-weight:700;margin-left:12px}
-    .controls{margin-top:16px}
-    .log{margin-top:12px;max-height:220px;overflow:auto;border:1px solid #eee;padding:8px;border-radius:6px;background:#fff}
-    .log .item{padding:8px;border-bottom:1px solid #f0f0f0;font-size:13px}
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      display: flex;
+      gap: 30px;
+    }
+    form {
+      width: 300px;
+    }
+    form input, form textarea, form button {
+      display: block;
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 8px;
+    }
+    .receipt {
+      width: 700px;
+      border: 2px solid black;
+      padding: 20px;
+    }
+    .title {
+      text-align: center;
+      text-decoration: underline;
+      margin-bottom: 20px;
+      font-size: 20px;
+      font-weight: bold;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .details {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .details td {
+      border: 1px solid black;
+      padding: 8px;
+    }
+    .footer {
+      margin-top: 20px;
+    }
+    .footer p {
+      margin: 5px 0;
+    }
   </style>
 </head>
 <body>
-  <div class="app">
-    <div class="panel">
-      <h2>Receipt controls</h2>
-      <label>Name</label>
-      <input id="name" value="Sis Jessy & Family Thane">
-      <label>Payment via</label>
-      <input id="payment" value="UPI">
-      <label>Amount</label>
-      <input id="amount" value="10000">
-      <label>Description</label>
-      <input id="description" value="National Youth Conference 2024 @ Delhi">
+  <!-- ✅ Form -->
+  <form>
+    <input id="name" type="text" placeholder="Customer Name" required>
+    <input id="payment" type="text" placeholder="Payment Method" required>
+    <input id="amount" type="number" placeholder="Amount (₹)" required>
+    <textarea id="description" placeholder="Description"></textarea>
+    <button type="button" id="previewBtn">Preview</button>
+    <button type="button" id="printBtn">Print & Save</button>
+  </form>
 
-      <div class="controls">
-        <button id="previewBtn">Generate Preview</button>
-        <button id="printBtn" class="secondary">Print / Save PDF</button>
-      </div>
+  <!-- ✅ Receipt Preview -->
+  <div id="receiptPreview" class="receipt">
+    <h2 class="title">RECEIPT</h2>
 
-      <h3 style="margin-top:14px">Issued receipts log</h3>
-      <div class="log" id="log"></div>
+    <div class="header">
+      <p><b>Invoice No:</b> <span id="inv">INV-001</span></p>
+      <p><b>Date:</b> <span id="date"></span></p>
     </div>
 
-    <div class="panel">
-      <div class="receipt" id="receiptPreview">
-        <div class="top">
-          <div>
-            <div class="small">Invoice Number: <span id="inv">INV 101</span></div>
-            <div class="small">Payment via: <span id="payPreview">UPI</span></div>
-          </div>
-          <div>
-            <h1>DONATION</h1>
-            <div class="small">Date: <span id="date"></span></div>
-          </div>
-        </div>
+    <table class="details">
+      <tr><td><b>Received From</b></td><td id="namePreview"></td></tr>
+      <tr><td><b>Payment Method</b></td><td id="payPreview"></td></tr>
+      <tr><td><b>Description</b></td><td id="descPreview"></td></tr>
+      <tr><td><b>Amount</b></td><td id="amountPreview"></td></tr>
+    </table>
 
-        <div class="table">
-          <div class="line">
-            <div id="namePreview">Enter Name</div>
-            <div id="descPreview">National Youth Conference 2025@Delhi</div>
-            <div id="amountPreview">10₹</div>
-          </div>
-        </div>
-
-        <div class="total">
-          <div style="flex:1;text-align:center;" class="small">Total in words: <strong id="words">Ten Thousand only.</strong></div>
-          <div class="box" id="totalBox">10000₹</div>
-        </div>
-      </div>
+    <div class="footer">
+      <p><b>Total (in words):</b> <span id="words"></span></p>
+      <p style="text-align:right;margin-top:40px;"><b>Authorized Signatory</b></p>
     </div>
   </div>
 
-<script>
-  const el = id => document.getElementById(id);
+  <!-- ✅ Main Script -->
+  <script type="module">
+    import { db, doc, getDoc, setDoc, updateDoc, storage, ref, uploadBytes } from "./index.html"; // Netlify will inline imports
 
-  let invoiceCounter = 1; // start invoice numbers
+    const el = id => document.getElementById(id);
 
-  function numberToWords(num){
-    num = parseInt(num,10);
-    if(!num) return 'Zero only.';
-    const a=["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
-    const b=["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
-    function inHundreds(n){
-      let str='';
-      if(n>=100){str += a[Math.floor(n/100)]+' Hundred '; n%=100}
-      if(n>=20){str += b[Math.floor(n/10)]+' '; if(n%10) str+=a[n%10]+' '} else if(n>0){str += a[n]+' '}
-      return str.trim();
+    // --- Firestore invoice number functions ---
+    async function getInvoiceCounter() {
+      const refDoc = doc(db, "settings", "invoiceCounter");
+      const snap = await getDoc(refDoc);
+      if (!snap.exists()) {
+        await setDoc(refDoc, { value: 1 });
+        return 1;
+      }
+      return snap.data().value;
     }
-    let out='';
-    const thousand = Math.floor(num/1000); if(thousand){out+= inHundreds(thousand)+' Thousand '; num%=1000}
-    if(num>0) out+= inHundreds(num);
-    return out.trim() + ' only.';
-  }
 
-  function updatePreview(){
-    const name = el('name').value;
-    const payment = el('payment').value;
-    const amount = el('amount').value;
-    const desc = el('description').value;
-    el('namePreview').textContent = name;
-    el('payPreview').textContent = payment;
-    el('amountPreview').textContent = amount + '₹';
-    el('totalBox').textContent = amount + '₹';
-    el('descPreview').textContent = desc;
-    el('words').textContent = numberToWords(amount);
-    el('date').textContent = new Date().toLocaleDateString();
+    async function incrementInvoiceCounter() {
+      const refDoc = doc(db, "settings", "invoiceCounter");
+      const snap = await getDoc(refDoc);
+      const current = snap.data().value || 1;
+      const next = current + 1;
+      await updateDoc(refDoc, { value: next });
+      return next;
+    }
 
-    // show current invoice number
-    el('inv').textContent = "INV-" + String(invoiceCounter).padStart(3,"0");
-  }
+    function numberToWords(num){
+      num = parseInt(num,10);
+      if(!num) return 'Zero only.';
+      const a=["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
+      const b=["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+      function inHundreds(n){
+        let str='';
+        if(n>=100){str += a[Math.floor(n/100)]+' Hundred '; n%=100}
+        if(n>=20){str += b[Math.floor(n/10)]+' '; if(n%10) str+=a[n%10]+' '}
+        else if(n>0){str += a[n]+' '}
+        return str.trim();
+      }
+      let out='';
+      const thousand = Math.floor(num/1000);
+      if(thousand){out+= inHundreds(thousand)+' Thousand '; num%=1000}
+      if(num>0) out+= inHundreds(num);
+      return out.trim() + ' only.';
+    }
 
-  el('previewBtn').addEventListener('click', updatePreview);
+    // --- Update Preview ---
+    async function updatePreview() {
+      const invoiceCounter = await getInvoiceCounter();
+      el("inv").textContent = "INV-" + String(invoiceCounter).padStart(3,"0");
+      el("date").textContent = new Date().toLocaleDateString();
+      el("namePreview").textContent = el("name").value;
+      el("payPreview").textContent = el("payment").value;
+      el("amountPreview").textContent = el("amount").value + "₹";
+      el("descPreview").textContent = el("description").value;
+      el("words").textContent = numberToWords(el("amount").value);
+    }
 
-  el('printBtn').addEventListener('click', ()=>{
+    el("previewBtn").addEventListener("click", updatePreview);
+
+    el("printBtn").addEventListener("click", async () => {
+      await updatePreview();
+
+      const invoiceCounter = await getInvoiceCounter();
+      const fileName = `INV-${String(invoiceCounter).padStart(3, "0")}.pdf`;
+
+      // 1. Generate PDF
+      const receiptElement = el("receiptPreview");
+      const pdfBlob = await html2pdf().from(receiptElement).outputPdf("blob");
+
+      // 2. Upload PDF to Firebase Storage
+      const storageRef = ref(storage, "receipts/" + fileName);
+      await uploadBytes(storageRef, pdfBlob);
+
+      alert("✅ Receipt saved to cloud as " + fileName);
+
+      // 3. Print
+      const w = window.open("", "_blank");
+      w.document.write("<html><head><title>Receipt</title></head><body>" + receiptElement.outerHTML + "</body></html>");
+      w.document.close();
+
+      setTimeout(async () => {
+        w.print();
+        await incrementInvoiceCounter();
+        await updatePreview();
+      }, 500);
+    });
+
+    // Init preview
     updatePreview();
-    const node = el('receiptPreview').outerHTML;
-    const w = window.open('', '_blank');
-    w.document.write('<html><head><title>Receipt</title></head><body>'+node+'</body></html>');
-    w.document.close();
-    setTimeout(()=>{
-      w.print();
-      // after printing, increase invoice number
-      invoiceCounter++;
-      updatePreview();
-    }, 500);
-  });
-
-  // init
-  updatePreview();
-</script>
-
+  </script>
 </body>
 </html>
